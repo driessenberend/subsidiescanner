@@ -57,19 +57,47 @@ def _enrich_matches(
 ) -> pd.DataFrame:
     df = matches_df.copy()
 
+    # Normaliseer typen voor IDs om merge-fouten te voorkomen
+    if "organisatie_id" in df.columns:
+        df["organisatie_id"] = pd.to_numeric(df["organisatie_id"], errors="coerce").astype("Int64")
+    if "subsidie_id" in df.columns:
+        df["subsidie_id"] = pd.to_numeric(df["subsidie_id"], errors="coerce").astype("Int64")
+    if "persona_id" in df.columns:
+        df["persona_id"] = pd.to_numeric(df["persona_id"], errors="coerce").astype("Int64")
+
+    if "organisatie_id" in orgs_df.columns:
+        orgs_df = orgs_df.copy()
+        orgs_df["organisatie_id"] = pd.to_numeric(
+            orgs_df["organisatie_id"], errors="coerce"
+        ).astype("Int64")
+
+    if "subsidie_id" in subs_df.columns:
+        subs_df = subs_df.copy()
+        subs_df["subsidie_id"] = pd.to_numeric(
+            subs_df["subsidie_id"], errors="coerce"
+        ).astype("Int64")
+
+    if "persona_id" in personas_df.columns:
+        personas_df = personas_df.copy()
+        personas_df["persona_id"] = pd.to_numeric(
+            personas_df["persona_id"], errors="coerce"
+        ).astype("Int64")
+
+    # Organisatienaam erbij
     df = df.merge(
         orgs_df[["organisatie_id", "organisatie_naam"]],
         how="left",
         on="organisatie_id",
     )
 
+    # Subsidie-info erbij
     df = df.merge(
         subs_df[["subsidie_id", "subsidie_naam", "bron"]],
         how="left",
         on="subsidie_id",
     )
 
-    personas_df = personas_df.copy()
+    # Persona-label construeren en mergen
     personas_df["persona_label"] = (
         personas_df["persona_id"].astype(str)
         + " – "
