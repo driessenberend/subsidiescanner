@@ -1,5 +1,7 @@
 # data/data_store.py
+# data/data_store.py
 from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
 
 import pandas as pd
 import streamlit as st
@@ -156,7 +158,6 @@ def _seed_subsidies() -> pd.DataFrame:
         },
     ]
     df = pd.DataFrame(data)
-    # Zorg dat datumkolommen als datetime worden opgeslagen
     df["datum_toegevoegd"] = pd.to_datetime(df["datum_toegevoegd"])
     df["sluitingsdatum"] = pd.to_datetime(df["sluitingsdatum"])
     return df
@@ -249,7 +250,7 @@ def _seed_matches() -> pd.DataFrame:
 
 
 def _seed_newsletters() -> pd.DataFrame:
-    """Optioneel wat dummy-nieuwsbrieven, maar standaard leeg gelaten."""
+    """Lege dummy-nieuwsbrieven-tabel."""
     columns = [
         "nieuwsbrief_id",
         "organisatie_id",
@@ -279,14 +280,14 @@ def _seed_prompts() -> pd.DataFrame:
                 "Samenvatting eisen:\n"
                 "{samenvatting_eisen}\n\n"
                 "Geef een JSON-respons met exact de volgende velden:\n"
-                "{{\n"
+                "{\n"
                 '  "match_score": <integer tussen 1 en 100>,\n'
                 '  "match_toelichting": [\n'
-                "    \"korte bullet 1\",\n"
-                "    \"korte bullet 2\",\n"
-                "    \"korte bullet 3\"\n"
+                '    "korte bullet 1",\n'
+                '    "korte bullet 2",\n'
+                '    "korte bullet 3"\n'
                 "  ]\n"
-                "}}\n"
+                "}\n"
             ),
             "laatst_gewijzigd": today,
             "actief": True,
@@ -323,7 +324,7 @@ def next_id(table_key: str, id_column: str) -> int:
     return int(max_val) + 1
 
 
-def get_active_prompt() -> dict | None:
+def get_active_prompt() -> Optional[Dict[str, Any]]:
     """Geef het actieve promptrecord als dict."""
     prompts_df = st.session_state[PROMPTS_KEY]
     active_id = st.session_state.get(ACTIVE_PROMPT_ID_KEY)
