@@ -1,15 +1,13 @@
-# app.py
 import streamlit as st
 
 from data.data_store import init_session_state
-from views import (
-    home,
-    matches,
-    companies,
-    personas,
-    subsidies,
-    newsletters,
-)
+
+import views.home as home
+import views.matches as matches
+import views.companies as companies
+import views.personas as personas
+import views.subsidies as subsidies
+import views.newsletters as newsletters
 
 
 def configure_page() -> None:
