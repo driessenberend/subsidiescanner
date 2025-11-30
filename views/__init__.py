@@ -10,4 +10,3 @@ Submodules:
 - subsidies
 - newsletters
 """
-sletters  # noqa: F401
