@@ -38,30 +38,32 @@ def render_subsidies() -> None:
     )
 
     st.markdown("---")
-    cols = st.columns([2, 1])
-    with cols[0]:
-        _render_subsidie_detail(subs_df)
-    with cols[1]:
-        _render_add_subsidie(subs_df)
+    _render_subsidie_detail(subs_df)
+
+    st.markdown("---")
+    _render_add_subsidie(subs_df)
 
 
 def _render_filters(df: pd.DataFrame) -> dict:
     col_bron, col_date, col_search = st.columns([1, 1.2, 2])
 
     with col_bron:
-        bronnen = ["Alle"] + sorted(df["bron"].dropna().unique().tolist())
+        if df.empty:
+            bronnen = ["Alle"]
+        else:
+            bronnen = ["Alle"] + sorted(df["bron"].dropna().unique().tolist())
         bron_filter = st.selectbox("Bron", bronnen)
 
     with col_date:
-        min_date = df["sluitingsdatum"].min().date() if not df.empty else None
-        max_date = df["sluitingsdatum"].max().date() if not df.empty else None
-        if min_date and max_date:
+        if df.empty:
+            date_range = None
+        else:
+            min_date = df["sluitingsdatum"].min().date()
+            max_date = df["sluitingsdatum"].max().date()
             date_range = st.date_input(
                 "Sluitingsdatum tussen",
                 value=(min_date, max_date),
             )
-        else:
-            date_range = None
 
     with col_search:
         search_text = st.text_input(
@@ -78,6 +80,9 @@ def _render_filters(df: pd.DataFrame) -> dict:
 
 def _apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     out = df.copy()
+
+    if out.empty:
+        return out
 
     if filters["bron_filter"] != "Alle":
         out = out[out["bron"] == filters["bron_filter"]]
@@ -175,7 +180,7 @@ def _render_subsidie_detail(subs_df: pd.DataFrame) -> None:
         )
         st.success("Subsidie bijgewerkt.")
 
-    st.markdown("---")
+    st.markdown("### Matches voor deze subsidie")
     _render_subsidie_matches(sub_id)
 
 
@@ -208,8 +213,6 @@ def _update_subsidie(
 
 
 def _render_subsidie_matches(sub_id: int) -> None:
-    st.markdown("### Matches voor deze subsidie")
-
     matches_df = get_table(MATCHES_KEY)
     orgs_df = get_table(ORGANISATIONS_KEY)
     personas_df = get_table(PERSONAS_KEY)
@@ -223,13 +226,16 @@ def _render_subsidie_matches(sub_id: int) -> None:
         columns={"organisatie_naam": "org_naam"}
     )
     personas_df = personas_df.copy()
-    personas_df["persona_label"] = (
-        personas_df["persona_id"].astype(str)
-        + " – "
-        + personas_df["persona_sector"].fillna("")
-        + " / "
-        + personas_df["persona_organisatie_type"].fillna("")
-    )
+    if not personas_df.empty:
+        personas_df["persona_label"] = (
+            personas_df["persona_id"].astype(str)
+            + " – "
+            + personas_df["persona_sector"].fillna("")
+            + " / "
+            + personas_df["persona_organisatie_type"].fillna("")
+        )
+    else:
+        personas_df["persona_label"] = pd.Series(dtype=str)
 
     subs_matches = subs_matches.merge(
         orgs_df[["organisatie_id", "org_naam"]],
