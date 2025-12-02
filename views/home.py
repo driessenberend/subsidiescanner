@@ -1,7 +1,7 @@
 # views/home.py
 import streamlit as st
 
-from data.data_store import get_active_prompt, get_table, PROMPTS_KEY
+from data.data_store import get_active_prompt, get_table, PROMPTS_KEY, MATCHES_KEY
 from services.matching import recompute_all_matches, update_prompt_template
 from services.llm_client import get_llm_client
 
@@ -23,12 +23,19 @@ def _render_intro() -> None:
 
     st.markdown(
         """
-Subsidiematch helpt bepalen welke subsidies relevant zijn voor organisaties en persona’s:
+Subsidiematch helpt bepalen welke subsidies relevant zijn voor organisaties:
 
-- Organisaties en persona’s worden beschreven met een profiel.
-- Subsidies hebben een set kenmerken (doelgroep, eisen, bedragen).
-- Een LLM (of mock-logica) beoordeelt de fit en geeft een **matchscore (1–100)** en korte toelichting.
-- Resultaten worden opgeslagen in de tabel **Matches** en gebruikt voor o.a. nieuwsbrieven.
+- Organisaties worden vastgelegd met basiskenmerken en een tekstueel profiel.
+- Subsidies hebben kenmerken zoals bron, doelgroep, eisen en subsidiebedrag.
+- Een LLM (of mock-logica) beoordeelt per organisatie–subsidie-combinatie de fit.
+- Het resultaat is een **matchscore (1–100)** plus een korte toelichting.
+- Alle uitkomsten komen in de tabel **Matches** en zijn zichtbaar op het tabblad *Matches*.
+
+Je kunt in deze PoC:
+- organisaties bekijken, aanpassen, toevoegen en verwijderen (tab *Organisations*);
+- subsidies bekijken, aanpassen, toevoegen en verwijderen (tab *Subsidies*);
+- alle matches bekijken en filteren (tab *Matches*);
+- de prompt aanpassen waarmee de LLM de matchscore bepaalt (hier op *Home*), en daarna alle matches opnieuw laten berekenen.
         """
     )
 
@@ -38,19 +45,20 @@ def _render_flow_overview() -> None:
 
     st.markdown(
         """
-Globale stappen:
+Globale stappen in deze vereenvoudigde versie:
 
-1. **Data-ingang**
-   - Organisaties, subsidies en persona’s worden vastgelegd in tabellen.
-2. **Matching**
-   - Voor elke organisatie/persona × subsidie wordt een prompt opgebouwd.
-   - De prompt gaat naar een LLM of, zonder API-key, naar een mock-functie.
-3. **Resultaat**
-   - Per combinatie ontstaat een matchscore (1–100) plus toelichting.
-   - Deze wordt als rij in **Matches** opgeslagen.
-4. **Gebruik**
-   - Overzicht van beste matches per organisatie/persona.
-   - Samenstellen van nieuwsbrieven per organisatie.
+1. **Input**
+   - Organisaties: naam, type, sector, locatie, profieltekst.
+   - Subsidies: naam, bron, voor wie, eisen, sluitingsdatum, bedrag.
+2. **Promptopbouw**
+   - Voor elke organisatie–subsidie-combinatie wordt een prompt opgebouwd op basis van het actieve prompt-template.
+3. **Beoordeling**
+   - De prompt gaat naar een LLM (of mock-algoritme als er geen API-key is).
+   - De LLM retourneert een matchscore (1–100) en een korte toelichting.
+4. **Opslag**
+   - Resultaat wordt als rij in de tabel **Matches** opgeslagen.
+5. **Analyse**
+   - In het tabblad *Matches* filter en sorteer je de combinaties op score en bekijk je de toelichting.
         """
     )
 
@@ -60,25 +68,16 @@ Globale stappen:
 digraph G {
     rankdir=LR;
 
-    subgraph cluster_org {
-        label="Organisaties & Persona's";
-        style=dashed;
-        orgs [label="Organisaties"];
-        personas [label="Persona's"];
-    }
-
-    subsidies [label="Subsidies"];
-    prompt [label="Prompt-template"];
-    llm [label="LLM / mock"];
-    matches [label="Matches"];
-    newsletters [label="Nieuwsbrieven"];
+    orgs        [label="Organisations"];
+    subsidies   [label="Subsidies"];
+    prompt      [label="Prompt-template"];
+    llm         [label="LLM / mock"];
+    matches     [label="Matches"];
 
     orgs -> prompt;
-    personas -> prompt;
     subsidies -> prompt;
     prompt -> llm;
     llm -> matches;
-    matches -> newsletters;
 }
             """
         )
@@ -89,13 +88,13 @@ def _render_prompt_editor() -> None:
 
     active = get_active_prompt()
     if active is None:
-        st.warning("Geen actieve prompt gevonden.")
+        st.warning("Er is geen actieve prompt gevonden.")
         return
 
     llm_client = get_llm_client()
     if llm_client.is_real():
         st.info(
-            "Er is een OPENAI_API_KEY geconfigureerd. Matches gebruiken de echte LLM backend."
+            "Er is een OPENAI_API_KEY geconfigureerd. Matches gebruiken de echte LLM-backend."
         )
     else:
         st.info(
@@ -116,12 +115,20 @@ def _render_prompt_editor() -> None:
 
     current_template = active.get("prompt_template", "")
 
-    new_template = st.text_area(
+        new_template = st.text_area(
         label="Prompt-template",
         value=current_template,
         height=300,
-        help="Gebruik placeholders zoals {organisatieprofiel}, {subsidie_naam}, {bron}, {voor_wie}, {samenvatting_eisen}.",
+        help=(
+            "Gebruik placeholders zoals {organisatieprofiel}, {subsidie_naam}, {bron}, "
+            "{voor_wie}, {samenvatting_eisen}."
+        ),
     )
+
+    # Bepaal of er al matches bestaan
+    matches_df = get_table(MATCHES_KEY)
+    has_matches = not matches_df.empty
+    button_label = "Alle matches opnieuw berekenen" if has_matches else "Genereer matches"
 
     col_save, col_recompute = st.columns([1, 2])
 
@@ -131,26 +138,35 @@ def _render_prompt_editor() -> None:
             st.success("Prompt opgeslagen.")
 
     with col_recompute:
-        if st.button("Alle matches opnieuw berekenen"):
-            with st.spinner("Matches worden opnieuw berekend..."):
+        if st.button(button_label):
+            with st.spinner("Matches worden berekend..."):
                 recompute_all_matches()
-            st.success("Matches opnieuw berekend.")
+            st.success("Matches zijn bijgewerkt.")
 
 
 def _render_dataset_overview() -> None:
-    st.subheader("Overzicht van tabellen")
+    st.subheader("Overzicht van tabellen in deze PoC")
 
     prompts_df = get_table(PROMPTS_KEY)
+
     st.markdown(
         """
-De applicatie gebruikt in-memory tabellen (DataFrames) voor:
+Deze applicatie gebruikt in-memory tabellen (pandas DataFrames):
 
-- **Organisations**: bedrijven / instellingen
-- **Subsidies**: beschikbare regelingen
-- **Personas**: rollen / archetypes binnen organisaties
-- **Matches**: berekende combinaties met scores
-- **Newsletters**: gegenereerde nieuwsbrieven per organisatie
-- **Prompts**: gebruikte prompt-templates voor matching
+- **Organisations**  
+  Basisgegevens van organisaties en hun profiel.
+
+- **Subsidies**  
+  Beschikbare regelingen met bron, doel, eisen en financiële info.
+
+- **Matches**  
+  Gecombineerde resultaten per organisatie–subsidie:
+  matchscore, toelichting, datum.
+
+- **Prompts**  
+  Prompt-templates die bepalen hoe de LLM de match beoordeelt.
+
+De data leeft alleen in het geheugen: bij herstart van de app wordt de seed-data opnieuw geladen.
         """
     )
 

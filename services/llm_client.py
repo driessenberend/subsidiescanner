@@ -36,39 +36,58 @@ class LLMClient:
         return self._client is not None
 
     def score_match_org_subsidy(
-        self,
-        prompt_template: str,
-        organisatieprofiel: str,
-        subsidie: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        Bepaal match-score en toelichting voor een organisatie + subsidie.
+    self,
+    prompt_template: str,
+    org: Dict[str, Any],
+    subsidie: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Bepaal match-score en toelichting voor een organisatie + subsidie.
 
-        Verwacht een prompt-template met placeholders:
-        - {organisatieprofiel}
-        - {subsidie_naam}
-        - {bron}
-        - {voor_wie}
-        - {samenvatting_eisen}
+    Maakt ALLE relevante velden van organisatie en subsidie beschikbaar
+    als placeholders in het prompt-template.
+    """
 
-        Retourneert dict:
-        {
-            "match_score": int,
-            "match_toelichting": List[str]
-        }
-        """
-        prompt = prompt_template.format(
-            organisatieprofiel=organisatieprofiel,
-            subsidie_naam=subsidie.get("subsidie_naam", ""),
-            bron=subsidie.get("bron", ""),
-            voor_wie=subsidie.get("voor_wie", ""),
-            samenvatting_eisen=subsidie.get("samenvatting_eisen", ""),
-        )
+    def _fmt_date(value: Any) -> str:
+        if value is None:
+            return ""
+        try:
+            return str(pd.to_datetime(value).date())
+        except Exception:
+            return str(value)
 
-        if self._client is None:
-            return self._mock_response(organisatieprofiel, subsidie)
+    ctx = {
+        # Organisatievelden
+        "organisatie_id": org.get("organisatie_id", ""),
+        "organisatie_naam": org.get("organisatie_naam", ""),
+        "abonnement_type": org.get("abonnement_type", ""),
+        "sector": org.get("sector", ""),
+        "type_organisatie": org.get("type_organisatie", ""),
+        "omzet": org.get("omzet", ""),
+        "aantal_medewerkers": org.get("aantal_medewerkers", ""),
+        "locatie": org.get("locatie", ""),
+        "organisatieprofiel": org.get("organisatieprofiel", ""),
+        "website_link": org.get("website_link", ""),
 
-        return self._call_openai(prompt)
+        # Subsidievelden
+        "subsidie_id": subsidie.get("subsidie_id", ""),
+        "subsidie_naam": subsidie.get("subsidie_naam", ""),
+        "bron": subsidie.get("bron", ""),
+        "datum_toegevoegd": _fmt_date(subsidie.get("datum_toegevoegd")),
+        "sluitingsdatum": _fmt_date(subsidie.get("sluitingsdatum")),
+        "subsidiebedrag": subsidie.get("subsidiebedrag", ""),
+        "voor_wie": subsidie.get("voor_wie", ""),
+        "samenvatting_eisen": subsidie.get("samenvatting_eisen", ""),
+        "subsidie_tekst_volledig": subsidie.get("subsidie_tekst_volledig", ""),
+        "weblink": subsidie.get("weblink", ""),
+    }
+
+    prompt = prompt_template.format(**ctx)
+
+    if self._client is None:
+        return self._mock_response(org, subsidie)
+
+    return self._call_openai(prompt)
 
     # ------------------------------------------------------------
     # Interne helpers
@@ -153,37 +172,39 @@ class LLMClient:
         }
 
     @staticmethod
-    def _mock_response(
-        organisatieprofiel: str, subsidie: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Mock-respons op basis van simpele heuristiek, zodat de PoC werkt zonder API-key.
-        """
-        base = 60
-        profile = organisatieprofiel.lower()
-        naam = str(subsidie.get("subsidie_naam", "")).lower()
+    @staticmethod
+def _mock_response(
+    org: Dict[str, Any], subsidie: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Mock-respons op basis van simpele heuristiek, zodat de PoC werkt zonder API-key.
+    """
+    base = 60
+    profile = str(org.get("organisatieprofiel", "")).lower()
+    naam = str(subsidie.get("subsidie_naam", "")).lower()
 
-        if "onderwijs" in profile or "school" in profile:
-            if "onderwijs" in naam or "digitale" in naam:
-                base = 85
-        if "zorg" in profile or "thuiszorg" in profile:
-            if "zorg" in naam or "thuis" in naam:
-                base = 82
-        if "ai" in profile or "data" in profile:
-            if "ai" in naam or "data" in naam:
-                base = 90
+    if "onderwijs" in profile or "school" in profile or "mbo" in profile:
+        if "onderwijs" in naam or "digitale" in naam:
+            base = 85
+    if "zorg" in profile or "thuiszorg" in profile or "ouderenzorg" in profile:
+        if "zorg" in naam or "thuis" in naam:
+            base = 82
+    if "ai" in profile or "data" in profile:
+        if "ai" in naam or "data" in naam:
+            base = 90
 
-        score = max(40, min(95, base))
+    score = max(40, min(95, base))
 
-        bullets: List[str] = [
-            f"Mock-score gebaseerd op overlap tussen organisatieprofiel en subsidie '{subsidie.get('subsidie_naam', '')}'.",
-            "Deze score is gegenereerd zonder echte LLM-call (demo-modus).",
-        ]
+    bullets = [
+        f"Mock-score gebaseerd op overlap tussen organisatieprofiel en subsidie '{subsidie.get('subsidie_naam', '')}'.",
+        "Deze score is gegenereerd zonder echte LLM-call (demo-modus).",
+    ]
 
-        return {
-            "match_score": score,
-            "match_toelichting": bullets,
-        }
+    return {
+        "match_score": score,
+        "match_toelichting": bullets,
+    }
+
 
 
 # Singleton-achtige accessor, zodat niet overal een nieuwe client wordt aangemaakt

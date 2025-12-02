@@ -24,14 +24,16 @@ from services.llm_client import get_llm_client
 def recompute_all_matches() -> None:
     """
     Herbereken alle matches voor:
-    - alle organisaties x alle subsidies
-    - alle persona's x alle subsidies
+    - alle organisaties × alle subsidies
 
     Vervangt de huidige matches-tabel volledig.
     """
+    # Reset de tijdelijke teller voor match_id binnen deze run
+    if _TEMP_MATCH_COUNTER_KEY in st.session_state:
+        del st.session_state[_TEMP_MATCH_COUNTER_KEY]
+
     organisations_df = get_table(ORGANISATIONS_KEY)
     subsidies_df = get_table(SUBSIDIES_KEY)
-    personas_df = get_table(PERSONAS_KEY)
 
     prompt_record = get_active_prompt()
     if prompt_record is None:
@@ -43,19 +45,11 @@ def recompute_all_matches() -> None:
 
     all_rows = []
 
-    # Organisatie-matches
+    # Alleen organisatie-matches (geen persona's meer)
     for _, org in organisations_df.iterrows():
         for _, sub in subsidies_df.iterrows():
             row = _compute_single_match_org(
                 org.to_dict(), sub.to_dict(), prompt_template, llm_client
-            )
-            all_rows.append(row)
-
-    # Persona-matches
-    for _, persona in personas_df.iterrows():
-        for _, sub in subsidies_df.iterrows():
-            row = _compute_single_match_persona(
-                persona.to_dict(), sub.to_dict(), prompt_template, llm_client
             )
             all_rows.append(row)
 
@@ -90,7 +84,7 @@ def _compute_single_match_org(
     """
     result = llm_client.score_match_org_subsidy(
         prompt_template=prompt_template,
-        organisatieprofiel=org.get("organisatieprofiel", ""),
+        org=org,
         subsidie=subsidie,
     )
 
@@ -108,43 +102,6 @@ def _compute_single_match_org(
         "datum_toegevoegd": today,
     }
 
-
-def _compute_single_match_persona(
-    persona: Dict[str, Any],
-    subsidie: Dict[str, Any],
-    prompt_template: str,
-    llm_client,
-) -> Dict[str, Any]:
-    """
-    Bereken match voor één persona + één subsidie.
-
-    Hergebruikt hetzelfde prompt-template, met persona_omschrijving als 'organisatieprofiel'.
-    """
-    pseudo_profile = (
-        f"Persona-sector: {persona.get('persona_sector', '')}\n"
-        f"Persona-organisatietype: {persona.get('persona_organisatie_type', '')}\n\n"
-        f"Omschrijving:\n{persona.get('persona_omschrijving', '')}"
-    )
-
-    result = llm_client.score_match_org_subsidy(
-        prompt_template=prompt_template,
-        organisatieprofiel=pseudo_profile,
-        subsidie=subsidie,
-    )
-
-    match_id = _temp_match_id()
-    today = datetime.today()
-
-    return {
-        "match_id": match_id,
-        "subsidie_id": subsidie["subsidie_id"],
-        "organisatie_id": None,
-        "persona_id": persona["persona_id"],
-        "type": "persona",
-        "match_score": int(result.get("match_score", 50)),
-        "match_toelichting": "\n".join(result.get("match_toelichting", [])),
-        "datum_toegevoegd": today,
-    }
 
 
 # Voor een volledige reset van matches maken we tijdelijke ID's;

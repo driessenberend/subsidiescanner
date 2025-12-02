@@ -174,15 +174,9 @@ def _render_match_detail(df: pd.DataFrame) -> None:
     cols = st.columns(3)
     with cols[0]:
         st.metric("Matchscore", int(selected_row["match_score"]))
-        st.write("**Type**")
-        st.write(selected_row["type"])
     with cols[1]:
         st.write("**Organisatie**")
         st.write(selected_row.get("organisatie_naam") or "–")
-    with cols[2]:
-        st.write("**Persona-id**")
-        persona_id = selected_row.get("persona_id")
-        st.write(persona_id if pd.notna(persona_id) else "–")
 
     st.markdown("**Subsidie**")
     st.write(selected_row.get("subsidie_naam") or "Onbekend")
