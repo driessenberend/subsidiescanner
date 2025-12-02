@@ -109,7 +109,7 @@ def _seed_organisations() -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def def _seed_subsidies() -> pd.DataFrame:
+def _seed_subsidies() -> pd.DataFrame:
     """Dummy-subsidies voor de PoC, gebaseerd op bestaande regelingen."""
     today = datetime.today().date()
 
