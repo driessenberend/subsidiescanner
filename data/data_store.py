@@ -47,6 +47,15 @@ def init_session_state() -> None:
 # ------------------------------------------------------------
 # Seed-data
 # ------------------------------------------------------------
+def _seed_personas() -> pd.DataFrame:
+    """Lege persona-tabel voor compatibiliteit."""
+    columns = [
+        "persona_id",
+        "persona_sector",
+        "persona_organisatie_type",
+        "persona_omschrijving",
+    ]
+    return pd.DataFrame(columns=columns)
 
 
 def _seed_organisations() -> pd.DataFrame:
