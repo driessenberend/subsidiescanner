@@ -5,9 +5,8 @@ from data.data_store import init_session_state
 import views.home as home
 import views.matches as matches
 import views.companies as companies
-import views.personas as personas
 import views.subsidies as subsidies
-import views.newsletters as newsletters
+
 
 
 def configure_page() -> None:
@@ -34,9 +33,7 @@ def render_sidebar() -> str:
             "Home",
             "Matches",
             "Organisations",
-            "Personas",
             "Subsidies",
-            "Newsletters",
         ],
         label_visibility="collapsed",
     )
@@ -57,21 +54,18 @@ def main() -> None:
 
     page = render_sidebar()
 
-    # Simple router over de tabbladen
+    # Router over de tabbladen
     if page == "Home":
         home.render_home()
     elif page == "Matches":
         matches.render_matches()
     elif page == "Organisations":
         companies.render_companies()
-    elif page == "Personas":
-        personas.render_personas()
     elif page == "Subsidies":
         subsidies.render_subsidies()
-    elif page == "Newsletters":
-        newsletters.render_newsletters()
     else:
         st.error("Onbekende pagina-selectie.")
+
 
 
 if __name__ == "__main__":

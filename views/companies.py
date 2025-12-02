@@ -4,14 +4,12 @@ import pandas as pd
 
 from data.data_store import (
     MATCHES_KEY,
-    NEWSLETTERS_KEY,
     ORGANISATIONS_KEY,
     SUBSIDIES_KEY,
     get_table,
     next_id,
     set_table,
 )
-from services.newsletters import generate_newsletter_for_org, get_newsletters_for_org
 
 
 def render_companies() -> None:
@@ -41,11 +39,10 @@ def render_companies() -> None:
     )
 
     st.markdown("---")
-    cols = st.columns([2, 1])
-    with cols[0]:
-        _render_org_detail(orgs_df)
-    with cols[1]:
-        _render_add_delete_org(orgs_df)
+    _render_org_detail(orgs_df)
+
+    st.markdown("---")
+    _render_add_delete_org(orgs_df)
 
 
 def _render_filters(df: pd.DataFrame) -> dict:
@@ -174,42 +171,6 @@ def _render_org_detail(orgs_df: pd.DataFrame) -> None:
         )
         st.success("Organisatie bijgewerkt.")
 
-    st.markdown("---")
-    _render_org_matches_and_newsletters(org_id)
-
-
-def _update_org(
-    orgs_df: pd.DataFrame,
-    org_id: int,
-    naam: str,
-    abonnement_type: str,
-    sector: str,
-    type_org: str,
-    locatie: str,
-    omzet: float,
-    aantal_medewerkers: int,
-    website: str,
-    profiel: str,
-) -> None:
-    idx = orgs_df.index[orgs_df["organisatie_id"] == org_id]
-    if len(idx) == 0:
-        return
-
-    i = idx[0]
-    orgs_df.at[i, "organisatie_naam"] = naam
-    orgs_df.at[i, "abonnement_type"] = abonnement_type
-    orgs_df.at[i, "sector"] = sector
-    orgs_df.at[i, "type_organisatie"] = type_org
-    orgs_df.at[i, "locatie"] = locatie
-    orgs_df.at[i, "omzet"] = omzet
-    orgs_df.at[i, "aantal_medewerkers"] = aantal_medewerkers
-    orgs_df.at[i, "website_link"] = website
-    orgs_df.at[i, "organisatieprofiel"] = profiel
-
-    set_table(ORGANISATIONS_KEY, orgs_df)
-
-
-def _render_org_matches_and_newsletters(org_id: int) -> None:
     st.markdown("### Matches voor deze organisatie")
 
     matches_df = get_table(MATCHES_KEY)
@@ -242,46 +203,36 @@ def _render_org_matches_and_newsletters(org_id: int) -> None:
             use_container_width=True,
         )
 
-    st.markdown("### Nieuwsbrieven voor deze organisatie")
 
-    col_gen, col_info = st.columns([1, 3])
-    with col_gen:
-        if st.button("Genereer nieuwsbrief voor deze organisatie"):
-            new_newsletter = generate_newsletter_for_org(org_id)
-            st.success(
-                f"Nieuwsbrief aangemaakt (id {new_newsletter['nieuwsbrief_id']})."
-            )
+def _update_org(
+    orgs_df: pd.DataFrame,
+    org_id: int,
+    naam: str,
+    abonnement_type: str,
+    sector: str,
+    type_org: str,
+    locatie: str,
+    omzet: float,
+    aantal_medewerkers: int,
+    website: str,
+    profiel: str,
+) -> None:
+    idx = orgs_df.index[orgs_df["organisatie_id"] == org_id]
+    if len(idx) == 0:
+        return
 
-    with col_info:
-        st.caption(
-            "Nieuwsbrief bevat subsidies uit de laatste X weken, afhankelijk van het abonnement."
-        )
+    i = idx[0]
+    orgs_df.at[i, "organisatie_naam"] = naam
+    orgs_df.at[i, "abonnement_type"] = abonnement_type
+    orgs_df.at[i, "sector"] = sector
+    orgs_df.at[i, "type_organisatie"] = type_org
+    orgs_df.at[i, "locatie"] = locatie
+    orgs_df.at[i, "omzet"] = omzet
+    orgs_df.at[i, "aantal_medewerkers"] = aantal_medewerkers
+    orgs_df.at[i, "website_link"] = website
+    orgs_df.at[i, "organisatieprofiel"] = profiel
 
-    newsletters_df = get_newsletters_for_org(org_id)
-    if newsletters_df.empty:
-        st.info("Er zijn nog geen nieuwsbrieven verstuurd.")
-    else:
-        st.dataframe(
-            newsletters_df[
-                [
-                    "nieuwsbrief_id",
-                    "nieuwsbrief_datum",
-                    "organisatie_naam",
-                ]
-            ],
-            use_container_width=True,
-        )
-
-        selected_id = st.selectbox(
-            "Bekijk nieuwsbrief",
-            options=newsletters_df["nieuwsbrief_id"].tolist(),
-        )
-        selected_row = newsletters_df[
-            newsletters_df["nieuwsbrief_id"] == selected_id
-        ].iloc[0]
-
-        st.markdown("**Inhoud nieuwsbrief**")
-        st.text(selected_row["nieuwsbrief_content"])
+    set_table(ORGANISATIONS_KEY, orgs_df)
 
 
 def _render_add_delete_org(orgs_df: pd.DataFrame) -> None:

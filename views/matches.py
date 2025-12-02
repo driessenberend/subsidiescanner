@@ -5,7 +5,6 @@ import pandas as pd
 from data.data_store import (
     MATCHES_KEY,
     ORGANISATIONS_KEY,
-    PERSONAS_KEY,
     SUBSIDIES_KEY,
     get_table,
 )
@@ -17,13 +16,12 @@ def render_matches() -> None:
     matches_df = get_table(MATCHES_KEY).copy()
     orgs_df = get_table(ORGANISATIONS_KEY)
     subs_df = get_table(SUBSIDIES_KEY)
-    personas_df = get_table(PERSONAS_KEY)
 
     if matches_df.empty:
         st.info("Er zijn nog geen matches beschikbaar.")
         return
 
-    matches_df = _enrich_matches(matches_df, orgs_df, subs_df, personas_df)
+    matches_df = _enrich_matches(matches_df, orgs_df, subs_df)
 
     filters = _render_filters(matches_df)
     filtered = _apply_filters(matches_df, filters)
@@ -36,7 +34,6 @@ def render_matches() -> None:
                 "type",
                 "match_score",
                 "organisatie_naam",
-                "persona_label",
                 "subsidie_naam",
                 "bron",
                 "datum_toegevoegd",
@@ -53,7 +50,6 @@ def _enrich_matches(
     matches_df: pd.DataFrame,
     orgs_df: pd.DataFrame,
     subs_df: pd.DataFrame,
-    personas_df: pd.DataFrame,
 ) -> pd.DataFrame:
     df = matches_df.copy()
 
@@ -62,25 +58,18 @@ def _enrich_matches(
         df["organisatie_id"] = pd.to_numeric(df["organisatie_id"], errors="coerce").astype("Int64")
     if "subsidie_id" in df.columns:
         df["subsidie_id"] = pd.to_numeric(df["subsidie_id"], errors="coerce").astype("Int64")
-    if "persona_id" in df.columns:
-        df["persona_id"] = pd.to_numeric(df["persona_id"], errors="coerce").astype("Int64")
+
+    orgs_df = orgs_df.copy()
+    subs_df = subs_df.copy()
 
     if "organisatie_id" in orgs_df.columns:
-        orgs_df = orgs_df.copy()
         orgs_df["organisatie_id"] = pd.to_numeric(
             orgs_df["organisatie_id"], errors="coerce"
         ).astype("Int64")
 
     if "subsidie_id" in subs_df.columns:
-        subs_df = subs_df.copy()
         subs_df["subsidie_id"] = pd.to_numeric(
             subs_df["subsidie_id"], errors="coerce"
-        ).astype("Int64")
-
-    if "persona_id" in personas_df.columns:
-        personas_df = personas_df.copy()
-        personas_df["persona_id"] = pd.to_numeric(
-            personas_df["persona_id"], errors="coerce"
         ).astype("Int64")
 
     # Organisatienaam erbij
@@ -95,21 +84,6 @@ def _enrich_matches(
         subs_df[["subsidie_id", "subsidie_naam", "bron"]],
         how="left",
         on="subsidie_id",
-    )
-
-    # Persona-label construeren en mergen
-    personas_df["persona_label"] = (
-        personas_df["persona_id"].astype(str)
-        + " – "
-        + personas_df["persona_sector"].fillna("")
-        + " / "
-        + personas_df["persona_organisatie_type"].fillna("")
-    )
-
-    df = df.merge(
-        personas_df[["persona_id", "persona_label"]],
-        how="left",
-        on="persona_id",
     )
 
     if "datum_toegevoegd" in df.columns:
@@ -140,7 +114,7 @@ def _render_filters(df: pd.DataFrame) -> dict:
 
     with col_search:
         search_text = st.text_input(
-            "Zoek in organisatie-, persona- of subsidienaam",
+            "Zoek in organisatie- of subsidienaam",
             value="",
         )
 
@@ -163,7 +137,6 @@ def _apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
         text = filters["search_text"]
         mask = (
             out["organisatie_naam"].fillna("").str.lower().str.contains(text)
-            | out["persona_label"].fillna("").str.lower().str.contains(text)
             | out["subsidie_naam"].fillna("").str.lower().str.contains(text)
         )
         out = out[mask]
@@ -207,8 +180,9 @@ def _render_match_detail(df: pd.DataFrame) -> None:
         st.write("**Organisatie**")
         st.write(selected_row.get("organisatie_naam") or "–")
     with cols[2]:
-        st.write("**Persona**")
-        st.write(selected_row.get("persona_label") or "–")
+        st.write("**Persona-id**")
+        persona_id = selected_row.get("persona_id")
+        st.write(persona_id if pd.notna(persona_id) else "–")
 
     st.markdown("**Subsidie**")
     st.write(selected_row.get("subsidie_naam") or "Onbekend")
@@ -219,3 +193,4 @@ def _render_match_detail(df: pd.DataFrame) -> None:
 
     st.markdown("**Datum toegevoegd**")
     st.write(selected_row.get("datum_toegevoegd"))
+
