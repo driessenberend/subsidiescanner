@@ -115,7 +115,7 @@ def _render_prompt_editor() -> None:
 
     current_template = active.get("prompt_template", "")
 
-        new_template = st.text_area(
+    new_template = st.text_area(
         label="Prompt-template",
         value=current_template,
         height=300,
