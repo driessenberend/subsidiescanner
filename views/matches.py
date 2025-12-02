@@ -18,7 +18,7 @@ def render_matches() -> None:
     subs_df = get_table(SUBSIDIES_KEY)
 
     if matches_df.empty:
-        st.info("Er zijn nog geen matches beschikbaar.")
+        st.info("Er zijn nog geen matches beschikbaar. Genereer matches met AI via het tabblad 'Home'.")
         return
 
     matches_df = _enrich_matches(matches_df, orgs_df, subs_df)
