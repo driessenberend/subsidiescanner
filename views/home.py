@@ -143,37 +143,3 @@ def _render_prompt_editor() -> None:
                 recompute_all_matches()
             st.success("Matches zijn bijgewerkt.")
 
-
-def _render_dataset_overview() -> None:
-    st.subheader("Overzicht van tabellen in deze PoC")
-
-    prompts_df = get_table(PROMPTS_KEY)
-
-    st.markdown(
-        """
-Deze applicatie gebruikt in-memory tabellen (pandas DataFrames):
-
-- **Organisations**  
-  Basisgegevens van organisaties en hun profiel.
-
-- **Subsidies**  
-  Beschikbare regelingen met bron, doel, eisen en financiële info.
-
-- **Matches**  
-  Gecombineerde resultaten per organisatie–subsidie:
-  matchscore, toelichting, datum.
-
-- **Prompts**  
-  Prompt-templates die bepalen hoe de LLM de match beoordeelt.
-
-De data leeft alleen in het geheugen: bij herstart van de app wordt de seed-data opnieuw geladen.
-        """
-    )
-
-    with st.expander("Prompts-tabel (read-only overzicht)", expanded=False):
-        st.dataframe(
-            prompts_df[
-                ["prompt_id", "naam", "laatst_gewijzigd", "actief"]
-            ].sort_values("prompt_id"),
-            use_container_width=True,
-        )
