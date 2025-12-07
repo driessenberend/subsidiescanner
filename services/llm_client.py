@@ -1,11 +1,5 @@
-# services/llm_client.py
-
-from __future__ import annotations
-
 import os
-from typing import Any, Dict, List
-
-import pandas as pd
+import json
 import streamlit as st
 
 
@@ -30,50 +24,34 @@ class LLMClient:
     def is_real(self) -> bool:
         return self._client is not None
 
-    #
-    # -------------------------------
-    #  ORGANISATIE × SUBSIDIE MATCHER
-    # -------------------------------
-    #
-
-    def score_match_org_subsidy(
-        self,
-        prompt_template: str,
-        org: Dict[str, Any],
-        subsidie: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    # --------------------------------------------------------
+    # PUBLIC API
+    # --------------------------------------------------------
+    def score_match_org_subsidy(self, prompt_template, org, subsidie):
         """
-        Bepaal match-score en toelichting voor een organisatie + subsidie.
+        Bouw de prompt → LLM-call → interpreteer JSON.
         """
 
-        def _fmt_date(value: Any) -> str:
-            if value is None:
-                return ""
-            try:
-                return str(pd.to_datetime(value).date())
-            except Exception:
-                return str(value)
-
-        # context met ALLE velden die we beschikbaar willen maken
+        # Context voor .format()
         ctx = {
-            # Organisatie
+            # organisatie
             "organisatie_id": org.get("organisatie_id", ""),
             "organisatie_naam": org.get("organisatie_naam", ""),
-            "abonnement_type": org.get("abonnement_type", ""),
             "sector": org.get("sector", ""),
             "type_organisatie": org.get("type_organisatie", ""),
+            "locatie": org.get("locatie", ""),
             "omzet": org.get("omzet", ""),
             "aantal_medewerkers": org.get("aantal_medewerkers", ""),
-            "locatie": org.get("locatie", ""),
-            "organisatieprofiel": org.get("organisatieprofiel", ""),
+            "abonnement_type": org.get("abonnement_type", ""),
             "website_link": org.get("website_link", ""),
+            "organisatieprofiel": org.get("organisatieprofiel", ""),
 
-            # Subsidie
+            # subsidie
             "subsidie_id": subsidie.get("subsidie_id", ""),
             "subsidie_naam": subsidie.get("subsidie_naam", ""),
             "bron": subsidie.get("bron", ""),
-            "datum_toegevoegd": _fmt_date(subsidie.get("datum_toegevoegd")),
-            "sluitingsdatum": _fmt_date(subsidie.get("sluitingsdatum")),
+            "datum_toegevoegd": subsidie.get("datum_toegevoegd", ""),
+            "sluitingsdatum": subsidie.get("sluitingsdatum", ""),
             "subsidiebedrag": subsidie.get("subsidiebedrag", ""),
             "voor_wie": subsidie.get("voor_wie", ""),
             "samenvatting_eisen": subsidie.get("samenvatting_eisen", ""),
@@ -81,64 +59,22 @@ class LLMClient:
             "weblink": subsidie.get("weblink", ""),
         }
 
-        prompt = prompt_template.format(**ctx)
+        # Formatteer de prompt veilig
+        prompt = prompt_template.format_map(_SafeDict(ctx))
 
-        if self._client is None:
+        # Kies mock-LLM of echte OpenAI
+        if not self.is_real():
             return self._mock_response(org, subsidie)
 
         return self._call_openai(prompt)
 
-    #
-    # -----------------------
-    #  MOCK FALLBACK LOGICA
-    # -----------------------
-    #
-
-    @staticmethod
-    def _mock_response(org: Dict[str, Any], subsidie: Dict[str, Any]) -> Dict[str, Any]:
+    # --------------------------------------------------------
+    # PRIVATE: ECHTE OPENAI CALL
+    # --------------------------------------------------------
+    def _call_openai(self, prompt: str):
         """
-        Mock-matchscore voor wanneer geen OPENAI_API_KEY beschikbaar is.
-        """
-        base = 60
-        profile = str(org.get("organisatieprofiel", "")).lower()
-        name = str(subsidie.get("subsidie_naam", "")).lower()
-
-        if "onderwijs" in profile or "school" in profile or "mbo" in profile:
-            if "onderwijs" in name or "digitale" in name:
-                base = 85
-
-        if "zorg" in profile or "oudere" in profile or "thuiszorg" in profile:
-            if "zorg" in name or "thuis" in name:
-                base = 82
-
-        if "ai" in profile or "data" in profile:
-            if "ai" in name or "data" in name:
-                base = 90
-
-        score = max(40, min(95, base))
-
-        bullets = [
-            f"Mock-score gebaseerd op overlap tussen organisatieprofiel en subsidie '{subsidie.get('subsidie_naam','')}'.",
-            "Demo-modus: geen echte LLM-call gedaan.",
-        ]
-
-        return {
-            "match_score": score,
-            "match_toelichting": bullets,
-        }
-
-    #
-    # ------------------------
-    #  OPENAI AANROEP
-    # ------------------------
-    #
-
-        def _call_openai(self, prompt: str) -> Dict[str, Any]:
-        """
-        Echte OpenAI-inferentie met de moderne Python-client.
-        Verwacht JSON-output met velden:
-        - match_score: int
-        - match_toelichting: list[str]
+        OpenAI chat-completion call volgens nieuwe API.
+        Verwacht JSON-object in response.
         """
         try:
             response = self._client.chat.completions.create(
@@ -156,33 +92,29 @@ class LLMClient:
                         "content": prompt,
                     },
                 ],
-                # Dwing JSON-object af
                 response_format={"type": "json_object"},
-                max_tokens=400,
                 temperature=0.2,
+                max_tokens=400,
             )
 
-            # NIEUW: message is een object, geen dict → gebruik .content
-            content = response.choices[0].message.content
-
-            import json
-            parsed = json.loads(content)
+            # Nieuwe API → message is object, geen dict → gebruik .content
+            raw_json = response.choices[0].message.content
+            parsed = json.loads(raw_json)
 
             score = int(parsed.get("match_score", 50))
+            toel = parsed.get("match_toelichting", [])
 
-            bullets = parsed.get("match_toelichting", [])
-            if isinstance(bullets, str):
-                bullets = [bullets]
-            elif not isinstance(bullets, list):
-                bullets = [str(bullets)]
+            if isinstance(toel, str):
+                toel = [toel]
+            elif not isinstance(toel, list):
+                toel = [str(toel)]
 
             return {
                 "match_score": score,
-                "match_toelichting": bullets,
+                "match_toelichting": toel,
             }
 
         except Exception as exc:
-            # Fallback zodat de app niet crasht
             return {
                 "match_score": 50,
                 "match_toelichting": [
@@ -191,14 +123,45 @@ class LLMClient:
                 ],
             }
 
+    # --------------------------------------------------------
+    # PRIVATE: MOCK (fallback)
+    # --------------------------------------------------------
+    def _mock_response(self, org, subsidie):
+        # Zeer eenvoudige demo-respons voor non-OpenAI modus
+        base_score = 40
+        if subsidie.get("sector") == org.get("sector"):
+            base_score += 30
 
-#
-# ------------------------
-#  FACTORY
-# ------------------------
-#
+        return {
+            "match_score": base_score,
+            "match_toelichting": [
+                "Mock-modus actief (geen echte OpenAI).",
+                f"Organisatie: {org.get('organisatie_naam')}",
+                f"Subsidie: {subsidie.get('subsidie_naam')}",
+            ],
+        }
 
-def get_llm_client() -> LLMClient:
-    if "_llm_client" not in st.session_state:
-        st.session_state["_llm_client"] = LLMClient()
-    return st.session_state["_llm_client"]
+
+# --------------------------------------------------------
+# HULP: SAFE FORMAT-DICT
+# --------------------------------------------------------
+class _SafeDict(dict):
+    """
+    Voorkomt KeyErrors in str.format_map().
+    Mist een key → return "".
+    """
+
+    def __missing__(self, key):
+        return ""
+
+
+# --------------------------------------------------------
+# FABRIEK
+# --------------------------------------------------------
+def get_llm_client():
+    """
+    Singleton LLM-client per sessie.
+    """
+    if "llm_client" not in st.session_state:
+        st.session_state["llm_client"] = LLMClient()
+    return st.session_state["llm_client"]
