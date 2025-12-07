@@ -274,7 +274,7 @@ def _seed_prompts() -> pd.DataFrame:
     today = datetime.today()
 
     data = [
-        {{
+        {
             "prompt_id": 1,
             "naam": "Standaard organisatiematch (volledige data)",
             "prompt_template": (
@@ -326,18 +326,18 @@ def _seed_prompts() -> pd.DataFrame:
                 "de thematiek en de doelstelling van de subsidie.\n\n"
 
                 "Produceer alleen de volgende JSON-output:\n"
-                "{\n"
+                "{{\n"
                 '  "match_score": <integer tussen 1 en 100>,\n'
                 '  "match_toelichting": [\n'
                 '    "korte bullet over de aansluiting",\n'
                 '    "korte bullet over sterke punten of tekortkomingen",\n'
                 '    "korte bullet ter motivatie van de score"\n'
                 "  ]\n"
-                "}\n"
+                "}}\n"
             ),
             "laatst_gewijzigd": today,
             "actief": True,
-        }}
+        }
     ]
 
     df = pd.DataFrame(data)
