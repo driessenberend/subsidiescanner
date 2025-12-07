@@ -274,7 +274,7 @@ def _seed_prompts() -> pd.DataFrame:
     today = datetime.today()
 
     data = [
-        {
+        {{
             "prompt_id": 1,
             "naam": "Standaard organisatiematch (volledige data)",
             "prompt_template": (
@@ -337,7 +337,7 @@ def _seed_prompts() -> pd.DataFrame:
             ),
             "laatst_gewijzigd": today,
             "actief": True,
-        }
+        }}
     ]
 
     df = pd.DataFrame(data)
