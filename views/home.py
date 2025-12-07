@@ -143,3 +143,25 @@ def _render_prompt_editor() -> None:
                 recompute_all_matches()
             st.success("Matches zijn bijgewerkt.")
 
+def _render_dataset_overview() -> None:
+    st.subheader("Overzicht van tabellen in deze PoC")
+
+    st.markdown(
+        """
+Deze applicatie gebruikt in-memory tabellen (pandas DataFrames) in `st.session_state`:
+
+- **Organisations**  
+  Basisgegevens van organisaties en hun profieltekst.
+
+- **Subsidies**  
+  Beschikbare regelingen met bron, doelgroep, eisen, bedragen en volledige tekst.
+
+- **Matches**  
+  Resultaten per organisatie–subsidie-combinatie: matchscore, toelichting, datum.
+
+- **Prompts**  
+  Prompt-templates die bepalen hoe de LLM de match beoordeelt.
+
+De data leeft alleen in het geheugen: bij herstart van de app wordt de seed-data opnieuw geladen.
+        """
+    )
