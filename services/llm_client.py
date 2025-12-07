@@ -133,32 +133,61 @@ class LLMClient:
     # ------------------------
     #
 
-    def _call_openai(self, prompt: str) -> Dict[str, Any]:
+        def _call_openai(self, prompt: str) -> Dict[str, Any]:
         """
-        Echte OpenAI-inferentie.
+        Echte OpenAI-inferentie met de moderne Python-client.
+        Verwacht JSON-output met velden:
+        - match_score: int
+        - match_toelichting: list[str]
         """
         try:
             response = self._client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Je bent een formele subsidie-analist. "
+                            "Je antwoordt uitsluitend in JSON volgens de gevraagde structuur."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                # Dwing JSON-object af
+                response_format={"type": "json_object"},
                 max_tokens=400,
+                temperature=0.2,
             )
 
-            raw = response.choices[0].message["content"]
+            # NIEUW: message is een object, geen dict → gebruik .content
+            content = response.choices[0].message.content
 
             import json
-            parsed = json.loads(raw)
+            parsed = json.loads(content)
+
+            score = int(parsed.get("match_score", 50))
+
+            bullets = parsed.get("match_toelichting", [])
+            if isinstance(bullets, str):
+                bullets = [bullets]
+            elif not isinstance(bullets, list):
+                bullets = [str(bullets)]
 
             return {
-                "match_score": parsed.get("match_score", 50),
-                "match_toelichting": parsed.get("match_toelichting", []),
+                "match_score": score,
+                "match_toelichting": bullets,
             }
+
         except Exception as exc:
+            # Fallback zodat de app niet crasht
             return {
                 "match_score": 50,
                 "match_toelichting": [
                     "Fout bij OpenAI-call.",
-                    f"{exc}",
+                    str(exc),
                 ],
             }
 
